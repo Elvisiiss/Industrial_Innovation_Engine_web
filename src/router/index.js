@@ -28,6 +28,50 @@ const routes = [
             const authStore = useAuthStore()
             return authStore.isAuthenticated ? '/index' : '/login'
         }
+    },
+    {
+        path: '/my-games',
+        name: 'MyGames',
+        component: () => import('@/views/IndexPage/MyGames.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/upload',
+        name: 'UploadGame',
+        component: () => import('@/views/IndexPage/UploadGame.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/review',
+        name: 'ReviewGames',
+        component: () => import('@/views/IndexPage/ReviewGames.vue'),
+        meta: {
+            requiresAuth: true,
+            roles: ['教师', '管理员']
+        }
+    },
+    {
+        path: '/users',
+        name: 'UserManagement',
+        component: () => import('@/views/IndexPage/UserManagement.vue'),
+        meta: {
+            requiresAuth: true,
+            roles: ['管理员']
+        }
+    },
+    {
+        path: '/logs',
+        name: 'OperationLogs',
+        component: () => import('@/views/IndexPage/OperationLogs.vue'),
+        meta: {
+            requiresAuth: true,
+            roles: ['教师', '管理员']
+        }
+    },
+    {
+        path: '/unauthorized',
+        name: 'Unauthorized',
+        component: () => import('@/views/IndexPage/Unauthorized.vue')
     }
 ]
 
@@ -38,10 +82,18 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
     const authStore = useAuthStore()
+    const userRole = authStore.user?.role || '学生'
 
-    // 只需要检查认证状态
+    // 需要认证的路由
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
         return next('/login')
+    }
+
+    // 权限检查
+    if (to.meta.roles) {
+        if (!to.meta.roles.includes(userRole)) {
+            return next('/unauthorized')
+        }
     }
 
     next()

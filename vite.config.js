@@ -1,10 +1,9 @@
+// vite.config.js
 import { fileURLToPath, URL } from 'node:url'
-
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
@@ -16,11 +15,17 @@ export default defineConfig({
     },
   },
   server: {
-    host: '0.0.0.0', // 监听所有 IPv4 地址
-    port: 5175,      // 指定端口（默认 5173）
-    strictPort: true, // 如果端口被占用，直接退出
-    allowedHosts: [
-      'cal' // 允许 cal 主机名访问
-    ]
+    host: '0.0.0.0',
+    port: 5175,
+    strictPort: true,
+    allowedHosts: ['cal'],
+    // 添加代理配置
+    proxy: {
+      '/api': {
+        target: 'http://192.168.1.105:5174', // 后端API地址
+        changeOrigin: true, // 允许跨域
+        rewrite: (path) => path.replace(/^\/api/, '') // 去掉路径中的/api前缀
+      }
+    }
   }
 })
