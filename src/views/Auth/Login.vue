@@ -45,13 +45,14 @@
 </template>
 
 <script setup>
-import {ref, onMounted, onUnmounted} from 'vue'
+import {onMounted, onUnmounted, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {useAuthStore} from '@/stores/auth'
 import authApi from '@/api/auth'
+import {ElMessage} from "element-plus";
 
-const account = ref('')
-const password = ref('')
+const account = ref('3122230220')
+const password = ref('Huawei@123')
 const errorMessage = ref('')
 const isLoading = ref(false)
 const router = useRouter()
@@ -83,8 +84,26 @@ const handleSubmit = async () => {
       user_number: account.value,
       passwd: password.value
     })
-    authStore.setUser(response.data)
-    await router.push('/index')
+    if(response.data.code==='Success'){
+      ElMessage.success(response.data.msg)
+      authStore.setUser(
+          response.data.data.id,
+          response.data.data.mail,
+          response.data.data.token,
+          response.data.data.userName,
+          response.data.data.userNickName,
+          response.data.data.userNumber,
+          response.data.data.userRole,
+      )
+      await router.push('/index')
+    }else if(response.data.code==='Error'){
+      ElMessage.error(response.data.msg)
+    }else{
+      alert(response.data.msg)
+    }
+
+
+
   } catch (error) {
     errorMessage.value = error.response?.data?.msg || '登录失败，请检查您的账号和密码'
   } finally {

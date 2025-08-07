@@ -48,6 +48,6 @@ export default {
 
     // 新增：获取游戏统计信息
     getStats() {
-        return request.get('/stats')
+        return request.get('/games/stats')
     }
 }

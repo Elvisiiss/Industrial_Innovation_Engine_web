@@ -18,7 +18,7 @@ request.interceptors.request.use(
             const token = authStore.user?.token
             if (token) {
                 // 添加认证头
-                config.headers.Authorization = `Bearer ${token}`
+                config.headers.Token = token
             }
         }
         return config

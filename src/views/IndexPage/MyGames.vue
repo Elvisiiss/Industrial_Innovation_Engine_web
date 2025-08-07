@@ -9,7 +9,7 @@
     </div>
 
     <el-table :data="games" style="width: 100%">
-      <el-table-column prop="title" label="游戏名称" />
+      <el-table-column prop="gameName" label="游戏名称" />
       <el-table-column prop="status" label="状态">
         <template #default="{ row }">
           <el-tag :type="row.status === '已发布' ? 'success' : 'info'">
@@ -17,8 +17,18 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="views" label="访问次数" />
-      <el-table-column prop="createdAt" label="创建时间" />
+      <el-table-column label="标签">
+        <template #default="{ row }">
+          <el-tag
+              v-for="(tag, index) in row.tags"
+              :key="index"
+              type="info"
+              style="margin-right: 5px; margin-bottom: 5px"
+          >
+            {{ tag.tagName }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="200">
         <template #default="{ row }">
           <el-button size="small" @click="editGame(row)">编辑</el-button>
@@ -37,13 +47,13 @@
     <el-dialog v-model="showUploadDialog" title="添加游戏">
       <el-form :model="newGame" label-width="100px">
         <el-form-item label="游戏名称" required>
-          <el-input v-model="newGame.title" />
+          <el-input v-model="newGame.gameName" />
         </el-form-item>
         <el-form-item label="游戏链接" required>
-          <el-input v-model="newGame.url" placeholder="https://" />
+          <el-input v-model="newGame.gameUrl" placeholder="https://" />
         </el-form-item>
         <el-form-item label="游戏描述">
-          <el-input v-model="newGame.description" type="textarea" rows="4" />
+          <el-input v-model="newGame.gameDescription" type="textarea" rows="4" />
         </el-form-item>
         <el-form-item label="游戏标签">
           <el-select
@@ -83,22 +93,25 @@ const games = ref([])
 const availableTags = ref(['冒险', '益智', '教育', '科幻', '历史', '策略', '动作'])
 const showUploadDialog = ref(false)
 const newGame = ref({
-  title: '',
-  url: '',
-  description: '',
+  gameName: '',
+  gameUrl: '',
+  gameDescription: '',
   tags: [],
-  status: '私有'
+  status: 'PRIVATE' // 默认私有状态
 })
 
 // 获取用户游戏
 const fetchGames = async () => {
   try {
     const response = await gameApi.getUserGames(authStore.user.user_id)
-    games.value = response.data.map(game => ({
-      ...game,
-      createdAt: new Date(game.created_at).toLocaleDateString(),
-      status: game.is_public ? '已发布' : '私有'
-    }))
+    if (response.data.code === 'Success') {
+      games.value = response.data.data.map(game => ({
+        ...game,
+        status: game.status === 'PUBILC' ? '已发布' : '私有'
+      }))
+    } else {
+      ElMessage.error(response.data.msg || '获取游戏列表失败')
+    }
   } catch (error) {
     ElMessage.error('获取游戏列表失败: ' + (error.response?.data?.message || error.message))
   }
@@ -108,11 +121,11 @@ const fetchGames = async () => {
 const addGame = async () => {
   try {
     const gameData = {
-      title: newGame.value.title,
-      url: newGame.value.url,
-      description: newGame.value.description,
-      tags: newGame.value.tags.join(','),
-      is_public: newGame.value.status === '发布'
+      gameName: newGame.value.gameName,
+      gameUrl: newGame.value.gameUrl,
+      gameDescription: newGame.value.gameDescription,
+      tags: newGame.value.tags,
+      status: newGame.value.status
     }
 
     await gameApi.createGame(gameData)
@@ -128,17 +141,16 @@ const addGame = async () => {
 // 切换游戏状态
 const toggleGameStatus = async (game) => {
   try {
-    const newStatus = game.status === '已发布' ? false : true
+    const newStatus = game.status === '已发布' ? 'PRIVATE' : 'PUBILC'
     await gameApi.changeGameStatus(game.id, newStatus)
     ElMessage.success('游戏状态已更新')
     fetchGames() // 刷新列表
   } catch (error) {
     ElMessage.error('更新状态失败: ' + (error.response?.data?.message || error.message))
-    fetchGames() // 刷新回原状态
   }
 }
 
-// 编辑游戏 (需要实现)
+// 编辑游戏
 const editGame = (game) => {
   console.log('编辑游戏:', game)
   // 实际实现需要打开编辑对话框
@@ -146,17 +158,16 @@ const editGame = (game) => {
 
 const resetNewGame = () => {
   newGame.value = {
-    title: '',
-    url: '',
-    description: '',
+    gameName: '',
+    gameUrl: '',
+    gameDescription: '',
     tags: [],
-    status: '私有'
+    status: 'PRIVATE'
   }
 }
 
 onMounted(fetchGames)
 </script>
-
 
 <style scoped>
 .my-games-container {

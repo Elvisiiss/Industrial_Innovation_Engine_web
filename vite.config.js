@@ -22,7 +22,7 @@ export default defineConfig({
     // 添加代理配置
     proxy: {
       '/api': {
-        target: 'http://192.168.1.105:5174', // 后端API地址
+        target: 'http://192.168.1.102:5174', // 后端API地址
         changeOrigin: true, // 允许跨域
         rewrite: (path) => path.replace(/^\/api/, '') // 去掉路径中的/api前缀
       }
