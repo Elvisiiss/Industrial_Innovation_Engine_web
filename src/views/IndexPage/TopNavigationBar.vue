@@ -36,15 +36,25 @@
     <!-- 游戏统计面板 -->
     <div v-if="showStats" class="stats-panel">
       <div class="stat-item">
-        <div class="stat-value">{{ stats.total_games || 0 }}</div>
+        <div class="stat-value">{{ stats.totalGamesNumber || 0 }}</div>
         <div class="stat-label">总游戏数</div>
       </div>
       <div class="stat-item">
-        <div class="stat-value">{{ stats.public_games || 0 }}</div>
+        <div class="stat-value">{{ stats.publicGamesNumber || 0 }}</div>
         <div class="stat-label">公开游戏</div>
       </div>
       <div class="stat-item">
-        <div class="stat-value">{{ stats.today_visits || 0 }}</div>
+        <div class="today-visits">
+          <div class="visit-value">
+            <span class="visit-number">{{ stats.todayGamesViewNumber || 0 }}</span>
+            <span class="visit-label">总访问</span>
+          </div>
+          <div class="visit-divider">/</div>
+          <div class="visit-value">
+            <span class="visit-number">{{ stats.todayGamesWithoutMeViewNumber || 0 }}</span>
+            <span class="visit-label">他人访问</span>
+          </div>
+        </div>
         <div class="stat-label">今日访问</div>
       </div>
     </div>
@@ -56,7 +66,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ArrowDown } from '@element-plus/icons-vue'
-import axios from 'axios'
 import MyGames from './MyGames.vue'
 import UploadGame from './UploadGame.vue'
 import ReviewGames from './ReviewGames.vue'
@@ -70,9 +79,10 @@ const router = useRouter()
 const route = useRoute()
 
 const stats = ref({
-  totalGames: 0,
-  publicGames: 0,
-  todayVisits: 0
+  totalGamesNumber: 0,
+  publicGamesNumber: 0,
+  todayGamesWithoutMeViewNumber: 0,
+  todayGamesViewNumber: 0
 })
 
 const showStats = ref(true)
@@ -123,7 +133,7 @@ const fetchStats = async () => {
   try {
     // 使用封装后的API
     const response = await gameApi.getStats()
-    stats.value = response.data
+    stats.value = response.data.data
   } catch (error) {
     console.error('获取统计信息失败', error)
   }
@@ -270,5 +280,34 @@ onMounted(() => {
   font-size: 13px;
   color: #7f8c8d;
   margin-top: 4px;
+}
+
+.today-visits {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.visit-value {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.visit-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: #3498db;
+}
+
+.visit-label {
+  font-size: 10px;
+  color: #95a5a6;
+}
+
+.visit-divider {
+  color: #bdc3c7;
+  font-size: 18px;
+  margin: 0 2px;
 }
 </style>

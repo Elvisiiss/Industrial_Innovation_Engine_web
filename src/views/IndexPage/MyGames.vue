@@ -12,7 +12,7 @@
       <el-table-column prop="gameName" label="游戏名称" />
       <el-table-column prop="status" label="状态">
         <template #default="{ row }">
-          <el-tag :type="row.status === '已发布' ? 'success' : 'info'">
+          <el-tag :type="row.status === '待审核' ? 'success' : 'info'">
             {{ row.status }}
           </el-tag>
         </template>
@@ -34,10 +34,10 @@
           <el-button size="small" @click="editGame(row)">编辑</el-button>
           <el-button
               size="small"
-              :type="row.status === '已发布' ? 'warning' : 'success'"
+              :type="row.status === '待审核' ? 'warning' : 'success'"
               @click="toggleGameStatus(row)"
           >
-            {{ row.status === '已发布' ? '设为私有' : '发布' }}
+            {{ row.status === '待审核' ? '设为私有' : '发布' }}
           </el-button>
         </template>
       </el-table-column>
@@ -107,7 +107,7 @@ const fetchGames = async () => {
     if (response.data.code === 'Success') {
       games.value = response.data.data.map(game => ({
         ...game,
-        status: game.status === 'PUBILC' ? '已发布' : '私有'
+        status: game.status === 'UNAPPROVED' ? '待审核' : '私有'
       }))
     } else {
       ElMessage.error(response.data.msg || '获取游戏列表失败')
@@ -141,8 +141,8 @@ const addGame = async () => {
 // 切换游戏状态
 const toggleGameStatus = async (game) => {
   try {
-    const newStatus = game.status === '已发布' ? 'PRIVATE' : 'PUBILC'
-    await gameApi.changeGameStatus(game.id, newStatus)
+    const newStatus = game.status === '待审核' ? 'PRIVATE' : 'UNAPPROVED'
+    await gameApi.changeGameStatus(game.id, newStatus, "-")
     ElMessage.success('游戏状态已更新')
     fetchGames() // 刷新列表
   } catch (error) {

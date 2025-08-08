@@ -22,8 +22,8 @@ export default {
     },
 
     // 更改游戏状态
-    changeGameStatus(gameId, status) {
-        return request.patch(`/games/${gameId}/status`, { status })
+    changeGameStatus(gameId, status, description) {
+        return request.patch(`/games/${gameId}/status`, { status, description })
     },
 
     // 获取待审核游戏
