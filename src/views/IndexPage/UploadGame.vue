@@ -3,17 +3,18 @@
     <h2>上传新游戏</h2>
 
     <el-form :model="gameForm" label-width="120px" class="game-form">
+      <!-- 其他表单字段保持不变 -->
       <el-form-item label="游戏名称" required>
-        <el-input v-model="gameForm.title" placeholder="请输入游戏名称" />
+        <el-input v-model="gameForm.gameName" placeholder="请输入游戏名称"/>
       </el-form-item>
 
       <el-form-item label="游戏链接" required>
-        <el-input v-model="gameForm.url" placeholder="https://" />
+        <el-input v-model="gameForm.gameUrl" placeholder="https://"/>
       </el-form-item>
 
       <el-form-item label="游戏描述">
         <el-input
-            v-model="gameForm.description"
+            v-model="gameForm.gameDescription"
             type="textarea"
             :rows="4"
             placeholder="请输入游戏描述"
@@ -22,33 +23,65 @@
 
       <el-form-item label="游戏封面">
         <el-upload
-            action="/api/upload"
             list-type="picture-card"
+            :http-request="handleCoverUpload"
             :on-success="handleCoverSuccess"
             :before-upload="beforeCoverUpload"
         >
-          <el-icon><Plus /></el-icon>
+          <el-icon>
+            <Plus/>
+          </el-icon>
         </el-upload>
       </el-form-item>
 
+      <!-- 重构后的标签区域 -->
       <el-form-item label="游戏标签">
-        <el-select
-            v-model="gameForm.tags"
-            multiple
-            filterable
-            allow-create
-            placeholder="请选择或创建标签"
-            style="width: 100%"
-        >
-          <el-option
-              v-for="tag in availableTags"
-              :key="tag"
-              :label="tag"
-              :value="tag"
-          />
-        </el-select>
+        <!-- 创建新标签按钮 -->
+        <div class="tag-controls">
+          <el-button type="primary" @click="showCreateTagDialog" size="small">
+            创建新标签
+          </el-button>
+        </div>
+
+        <!-- 可用标签区域 -->
+        <div class="tag-section">
+          <div class="section-title">可用标签</div>
+          <div class="tags-container">
+            <el-tag
+                v-for="tag in availableTags"
+                :key="tag.id || `avail_${tag.tagName}`"
+                class="tag-item"
+                :class="{ 'tag-selected': isTagSelected(tag) }"
+                @click="toggleTag(tag)"
+            >
+              <el-tooltip :content="tag.tagDescription || '无描述信息'" placement="top">
+                <span>{{ tag.tagName }}</span>
+              </el-tooltip>
+            </el-tag>
+          </div>
+        </div>
+
+        <!-- 已选标签区域 -->
+        <div class="tag-section">
+          <div class="section-title">已选标签</div>
+          <div class="tags-container">
+            <el-tag
+                v-for="tag in gameForm.tags"
+                :key="tag.id || `selected_${tag.tagName}`"
+                class="tag-item tag-selected"
+                closable
+                @close="removeTag(tag)"
+            >
+              <el-tooltip :content="tag.tagDescription || '无描述信息'" placement="top">
+                <span>{{ tag.tagName }}</span>
+              </el-tooltip>
+            </el-tag>
+            <div v-if="!gameForm.tags.length" class="empty-tags-hint">暂无已选标签</div>
+          </div>
+        </div>
       </el-form-item>
 
+      <!-- 其他表单字段保持不变 -->
       <el-form-item label="发布状态">
         <el-radio-group v-model="gameForm.status">
           <el-radio label="私有">仅自己可见</el-radio>
@@ -61,33 +94,170 @@
         <el-button @click="resetForm">重置</el-button>
       </el-form-item>
     </el-form>
+
+    <!-- 创建标签对话框 -->
+    <el-dialog
+        v-model="createTagDialogVisible"
+        title="创建新标签"
+        width="500px"
+        center
+    >
+      <el-form :model="newTagForm" label-width="80px">
+        <el-form-item label="标签名" required>
+          <el-input v-model="newTagForm.tagName" placeholder="请输入标签名称"/>
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input
+              v-model="newTagForm.tagDescription"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入标签描述"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createTagDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmCreateTag">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import {onMounted, ref} from 'vue'
+import {ElMessage} from 'element-plus'
+import {Plus} from '@element-plus/icons-vue'
 import gameApi from '@/api/game'
-import { useAuthStore } from '@/stores/auth'
+import {useAuthStore} from '@/stores/auth'
 
 const authStore = useAuthStore()
-const availableTags = ref(['冒险', '益智', '教育', '科幻', '历史', '策略', '动作'])
+const availableTags = ref([])
+
+// 获取标签数据
+const fetchTags = async () => {
+  try {
+    const response = await gameApi.getAllMyTags()
+    if (response.data.code === 'Success') {
+      availableTags.value = response.data.data
+    } else {
+      ElMessage.error('获取标签失败: ' + response.msg)
+    }
+  } catch (error) {
+    ElMessage.error('获取标签失败: ' + error.message)
+  }
+}
+
+onMounted(fetchTags)
 
 const gameForm = ref({
-  title: '',
-  url: '',
-  description: '',
-  cover: '',
+  gameName: '',
+  gameUrl: '',
+  gameDescription: '',
+  gamePicture: '',
   tags: [],
   status: '私有'
 })
 
+// 创建标签相关
+const createTagDialogVisible = ref(false)
+const newTagForm = ref({
+  tagName: '',
+  tagDescription: ''
+})
+
+const showCreateTagDialog = () => {
+  newTagForm.value = {tagName: '', tagDescription: ''}
+  createTagDialogVisible.value = true
+}
+
+const confirmCreateTag = async () => {
+  const {tagName, tagDescription} = newTagForm.value
+  if (!tagName.trim()) {
+    ElMessage.error('标签名称不能为空')
+    return
+  }
+
+  // 检查是否已存在
+  const exists = availableTags.value.some(tag =>
+      tag.tagName.toLowerCase() === tagName.toLowerCase()
+  )
+
+  if (exists) {
+    ElMessage.warning(`标签 "${tagName}" 已存在`)
+    createTagDialogVisible.value = false
+    return
+  }
+
+  // 创建新标签对象
+  const newTag = {
+    id: null,
+    tagName,
+    tagDescription: tagDescription || '无描述信息'
+  }
+
+  // 添加到可用标签
+  availableTags.value.push(newTag)
+  // 自动选中新标签
+  toggleTag(newTag)
+
+  ElMessage.success(`标签 "${tagName}" 创建成功`)
+  createTagDialogVisible.value = false
+}
+
+// 标签选择功能
+const isTagSelected = (tag) => {
+  return gameForm.value.tags.some(t =>
+      (t.id && t.id === tag.id) ||
+      (!t.id && t.tagName === tag.tagName))
+}
+
+const toggleTag = (tag) => {
+  if (isTagSelected(tag)) {
+    removeTag(tag)
+  } else {
+    addTag(tag)
+  }
+}
+
+const addTag = (tag) => {
+  if (!isTagSelected(tag)) {
+    gameForm.value.tags.push(tag)
+  }
+}
+
+const removeTag = (tag) => {
+  gameForm.value.tags = gameForm.value.tags.filter(t =>
+      (t.id && t.id !== tag.id) ||
+      (!t.id && t.tagName !== tag.tagName)
+  )
+}
+
+// 自定义上传方法，调用gameApi
+const handleCoverUpload = async (options) => {
+  try {
+    // 构建FormData对象（文件上传通常需要这种格式）
+    const formData = new FormData()
+    formData.append('pictureFile', options.file)  // 与接口参数名保持一致
+
+    // 调用gameApi中的上传方法
+    const response = await gameApi.uploadGamePicture(formData)
+
+    // 上传成功后调用on-success回调
+    options.onSuccess(response)
+  } catch (error) {
+    // 上传失败时调用错误处理
+    options.onError(error)
+    ElMessage.error('封面上传失败: ' + (error.response?.data?.message || error.message))
+  }
+}
+
+// 成功回调保持不变
 const handleCoverSuccess = (response) => {
-  gameForm.value.cover = response.url
+  gameForm.value.gamePicture = response.url  // 根据实际返回结构调整
   ElMessage.success('封面图片上传成功')
 }
 
+// 校验方法保持不变
 const beforeCoverUpload = (file) => {
   const isImage = file.type.startsWith('image/')
   const isLt2M = file.size / 1024 / 1024 < 2
@@ -104,17 +274,38 @@ const beforeCoverUpload = (file) => {
 
 const submitGame = async () => {
   try {
-    const gameData = {
-      title: gameForm.value.title,
-      url: gameForm.value.url,
-      description: gameForm.value.description,
-      tags: gameForm.value.tags.join(','),
-      cover_image: gameForm.value.cover,
-      user_id: authStore.user.user_id,
-      is_public: gameForm.value.status === '发布'
+    if (!gameForm.value.gameName.trim()) {
+      ElMessage.error('游戏名称不能为空')
+      return
     }
 
-    await gameApi.createGame(gameData)
+    if (!gameForm.value.gameUrl.trim()) {
+      ElMessage.error('游戏链接不能为空')
+      return
+    }
+
+    const tags = gameForm.value.tags.map(tag => ({
+      id: tag.id,
+      tagName: tag.tagName,
+      tagDescription: tag.tagDescription
+    }))
+
+    const statusMap = {
+      '私有': 'PRIVATE',
+      '发布': 'UNAPPROVED'
+    }
+
+    const gameData = {
+      gameName: gameForm.value.gameName,
+      gameUrl: gameForm.value.gameUrl,
+      gameDescription: gameForm.value.gameDescription,
+      gamePicture: gameForm.value.gamePicture,
+      tags: tags,
+      status: statusMap[gameForm.value.status]
+    }
+
+    const token = authStore.token
+    await gameApi.createGame(gameData, token)
     ElMessage.success('游戏提交成功！')
     resetForm()
   } catch (error) {
@@ -124,14 +315,15 @@ const submitGame = async () => {
 
 const resetForm = () => {
   gameForm.value = {
-    title: '',
-    url: '',
-    description: '',
-    cover: '',
+    gameName: '',
+    gameUrl: '',
+    gameDescription: '',
+    gamePicture: '',
     tags: [],
     status: '私有'
   }
 }
+
 </script>
 
 <style scoped>
@@ -152,5 +344,103 @@ h2 {
 .game-form {
   max-width: 800px;
   margin: 0 auto;
+}
+
+/* 标签区域样式修改 */
+.tag-controls {
+  margin-bottom: 15px;
+}
+
+.tag-section {
+  margin-bottom: 25px;
+  padding: 15px;
+  background-color: #f9fafc;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.section-title {
+  font-size: 15px;
+  color: #4e5969;
+  margin-bottom: 12px;
+  font-weight: 600;
+  padding-left: 5px;
+  display: flex;
+  align-items: center;
+}
+
+.section-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 16px;
+  background-color: #409eff;
+  border-radius: 2px;
+  margin-right: 8px;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 50px;
+  padding: 12px;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  background-color: #ffffff;
+  transition: border-color 0.3s;
+}
+
+.tags-container:hover {
+  border-color: #c9cdD4;
+}
+
+.tag-item {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  background-color: #f2f3f5;
+  color: #4e5969;
+  border: 1px solid transparent;
+}
+
+.tag-item:not(.tag-selected):hover {
+  background-color: #e5e6eb;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.tag-selected {
+  background-color: #ecf5ff;
+  color: #409eff;
+  border-color: #b3d8ff;
+  font-weight: 500;
+}
+
+.tag-selected:hover {
+  background-color: #d9ecff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+}
+
+.empty-tags-hint {
+  color: #86909c;
+  font-size: 13px;
+  padding: 8px 10px;
+  font-style: italic;
+}
+
+/* 修复标签关闭按钮样式 */
+:deep(.el-tag__close) {
+  margin-left: 6px;
+  color: #409eff;
+  opacity: 0.7;
+}
+
+:deep(.el-tag__close:hover) {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.2);
 }
 </style>

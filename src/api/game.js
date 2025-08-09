@@ -1,6 +1,15 @@
 import request from '@/utils/request'
 
 export default {
+    //得到所有我的标签
+    getAllMyTags(){
+        return request.get(`/tool/getAllMyTags`)
+    },
+
+    uploadGamePicture(pictureFile){
+        return request.post(`/tool/uploadGamePicture`,pictureFile)
+    },
+
     // 获取用户游戏列表
     getUserGames(userId) {
         return request.get(`/games/user/${userId}`)
