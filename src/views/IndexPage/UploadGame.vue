@@ -27,10 +27,23 @@
             :http-request="handleCoverUpload"
             :on-success="handleCoverSuccess"
             :before-upload="beforeCoverUpload"
+            :limit="1"
+            :on-exceed="handleExceed"
+            :file-list="coverFileList"
         >
           <el-icon>
             <Plus/>
           </el-icon>
+          <template #file="{ file }">
+            <div class="cover-preview">
+              <img :src="file.url" alt="游戏封面" class="cover-image"/>
+              <span class="cover-actions">
+                <span class="cover-delete" @click.stop="removeCover">
+                  <el-icon><Delete /></el-icon>
+                </span>
+              </span>
+            </div>
+          </template>
         </el-upload>
       </el-form-item>
 
@@ -126,12 +139,13 @@
 <script setup>
 import {onMounted, ref} from 'vue'
 import {ElMessage} from 'element-plus'
-import {Plus} from '@element-plus/icons-vue'
+import {Plus, Delete} from '@element-plus/icons-vue'
 import gameApi from '@/api/game'
 import {useAuthStore} from '@/stores/auth'
 
 const authStore = useAuthStore()
 const availableTags = ref([])
+const coverFileList = ref([])
 
 // 获取标签数据
 const fetchTags = async () => {
@@ -232,6 +246,16 @@ const removeTag = (tag) => {
   )
 }
 
+// 封面图片上传相关
+const handleExceed = () => {
+  ElMessage.warning('只能上传一张封面图片')
+}
+
+const removeCover = () => {
+  coverFileList.value = []
+  gameForm.value.gamePicture = ''
+}
+
 // 自定义上传方法，调用gameApi
 const handleCoverUpload = async (options) => {
   try {
@@ -251,13 +275,23 @@ const handleCoverUpload = async (options) => {
   }
 }
 
-// 成功回调保持不变
+// 成功回调
 const handleCoverSuccess = (response) => {
-  gameForm.value.gamePicture = response.url  // 根据实际返回结构调整
-  ElMessage.success('封面图片上传成功')
+  if (response.data.code === 'Success') {
+    const fileUrl = response.data.data
+    gameForm.value.gamePicture = fileUrl
+    coverFileList.value = [{
+      name: 'cover',
+      url: "api"+fileUrl
+    }]
+    console.log(coverFileList.value)
+    ElMessage.success('封面图片上传成功')
+  } else {
+    ElMessage.error(response.data.msg || '封面上传失败')
+  }
 }
 
-// 校验方法保持不变
+// 校验方法
 const beforeCoverUpload = (file) => {
   const isImage = file.type.startsWith('image/')
   const isLt2M = file.size / 1024 / 1024 < 2
@@ -299,7 +333,7 @@ const submitGame = async () => {
       gameName: gameForm.value.gameName,
       gameUrl: gameForm.value.gameUrl,
       gameDescription: gameForm.value.gameDescription,
-      gamePicture: gameForm.value.gamePicture,
+      gamePicture: "/api"+gameForm.value.gamePicture,
       tags: tags,
       status: statusMap[gameForm.value.status]
     }
@@ -322,6 +356,7 @@ const resetForm = () => {
     tags: [],
     status: '私有'
   }
+  coverFileList.value = []
 }
 
 </script>
@@ -442,5 +477,43 @@ h2 {
 :deep(.el-tag__close:hover) {
   opacity: 1;
   background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 封面图片样式 */
+.cover-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cover-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  padding: 4px;
+}
+
+.cover-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.cover-delete:hover {
+  background-color: rgba(0, 0, 0, 0.7);
 }
 </style>
