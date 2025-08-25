@@ -90,8 +90,8 @@ const formatImageUrl = (url) => {
 const statusText = (status) => {
   const map = {
     UNAPPROVED: '待审核',
-    APPROVED: '已通过',
-    REJECTED: '已拒绝'
+    PUBLIC: '已通过',
+    APPROVED: '已拒绝'
   }
   return map[status] || status
 }
@@ -99,8 +99,8 @@ const statusText = (status) => {
 const statusType = (status) => {
   const map = {
     UNAPPROVED: 'warning',
-    APPROVED: 'success',
-    REJECTED: 'danger'
+    PUBLIC: 'success',
+    APPROVED: 'danger'
   }
   return map[status] || ''
 }
@@ -126,7 +126,7 @@ const approveGame = (game) => {
     cancelButtonText: '取消',
     type: 'success'
   }).then(async () => {
-    const success = await reviewGame(game.id, 'approve', '')
+    const success = await reviewGame(game.id, 'PUBLIC', '+')
     if (success) {
       ElMessage.success(`游戏 "${game.gameName}" 已审核通过`)
       fetchPendingGames()
@@ -141,7 +141,7 @@ const rejectGame = (game) => {
     inputPattern: /.{5,}/,
     inputErrorMessage: '拒绝原因至少5个字符'
   }).then(async ({value}) => {
-    const success = await reviewGame(game.id, 'reject', value)
+    const success = await reviewGame(game.id, 'APPROVED', value)
     if (success) {
       ElMessage.error(`游戏 "${game.gameName}" 已拒绝`)
       fetchPendingGames()

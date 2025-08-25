@@ -1,9 +1,8 @@
 <template>
   <div class="upload-container">
-    <h2>上传新游戏</h2>
+    <h2>{{ isEditing ? '编辑游戏' : '上传新游戏' }}</h2>
 
     <el-form :model="gameForm" label-width="120px" class="game-form">
-      <!-- 其他表单字段保持不变 -->
       <el-form-item label="游戏名称" required>
         <el-input v-model="gameForm.gameName" placeholder="请输入游戏名称"/>
       </el-form-item>
@@ -30,6 +29,7 @@
             :limit="1"
             :on-exceed="handleExceed"
             :file-list="coverFileList"
+            :on-remove="handleCoverRemove"
         >
           <el-icon>
             <Plus/>
@@ -47,9 +47,8 @@
         </el-upload>
       </el-form-item>
 
-      <!-- 重构后的标签区域 -->
+      <!-- 标签区域 -->
       <el-form-item label="游戏标签">
-        <!-- 创建新标签按钮 -->
         <div class="tag-controls">
           <el-button type="primary" @click="showCreateTagDialog" size="small">
             创建新标签
@@ -94,7 +93,6 @@
         </div>
       </el-form-item>
 
-      <!-- 其他表单字段保持不变 -->
       <el-form-item label="发布状态">
         <el-radio-group v-model="gameForm.status">
           <el-radio label="私有">仅自己可见</el-radio>
@@ -103,7 +101,7 @@
       </el-form-item>
 
       <el-form-item>
-        <el-button type="primary" @click="submitGame">提交</el-button>
+        <el-button type="primary" @click="submitGame">{{ isEditing ? '更新' : '提交' }}</el-button>
         <el-button @click="resetForm">重置</el-button>
       </el-form-item>
     </el-form>
@@ -137,15 +135,19 @@
 </template>
 
 <script setup>
-import {onMounted, ref} from 'vue'
-import {ElMessage} from 'element-plus'
-import {Plus, Delete} from '@element-plus/icons-vue'
+import { onMounted, ref, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { Plus, Delete } from '@element-plus/icons-vue'
 import gameApi from '@/api/game'
-import {useAuthStore} from '@/stores/auth'
+import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
+const route = useRoute()
+const router = useRouter()
 const availableTags = ref([])
 const coverFileList = ref([])
+const isEditing = computed(() => !!route.query.gameId) // 判断是否为编辑模式
 
 // 获取标签数据
 const fetchTags = async () => {
@@ -161,7 +163,50 @@ const fetchTags = async () => {
   }
 }
 
-onMounted(fetchTags)
+// 获取游戏详情（编辑模式）
+const fetchGameDetail = async (gameId) => {
+  try {
+    const response = await gameApi.getGameById(gameId)
+    if (response.data.code === 'Success') {
+      const game = response.data.data
+      // 填充表单数据
+      gameForm.value = {
+        gameName: game.gameName,
+        gameUrl: game.gameUrl,
+        gameDescription: game.gameDescription,
+        gamePicture: game.gamePicture || '',
+        tags: game.tags || [],
+        status: game.status === 'PRIVATE' ? '私有' : '发布'
+      }
+
+      // 处理封面图片，修复图片显示问题
+      if (game.gamePicture) {
+        // 判断URL是否已包含完整路径
+        const isFullUrl = game.gamePicture.startsWith('http') || game.gamePicture.startsWith('/api')
+        const imageUrl = isFullUrl ? game.gamePicture : game.gamePicture
+
+        coverFileList.value = [{
+          name: 'cover',
+          url: imageUrl
+        }]
+      }
+    } else {
+      ElMessage.error('获取游戏详情失败: ' + response.data.msg)
+      router.push('/my-games') // 获取失败跳回我的游戏
+    }
+  } catch (error) {
+    ElMessage.error('获取游戏详情失败: ' + error.message)
+    router.push('/my-games')
+  }
+}
+
+onMounted(async () => {
+  await fetchTags()
+  // 如果是编辑模式，获取游戏详情
+  if (isEditing.value) {
+    await fetchGameDetail(route.query.gameId)
+  }
+})
 
 const gameForm = ref({
   gameName: '',
@@ -251,47 +296,44 @@ const handleExceed = () => {
   ElMessage.warning('只能上传一张封面图片')
 }
 
+// 处理封面移除事件
+const handleCoverRemove = () => {
+  removeCover()
+}
+
 const removeCover = () => {
   coverFileList.value = []
   gameForm.value.gamePicture = ''
 }
 
-// 自定义上传方法，调用gameApi
 const handleCoverUpload = async (options) => {
   try {
-    // 构建FormData对象（文件上传通常需要这种格式）
     const formData = new FormData()
-    formData.append('pictureFile', options.file)  // 与接口参数名保持一致
+    formData.append('pictureFile', options.file)
 
-    // 调用gameApi中的上传方法
     const response = await gameApi.uploadGamePicture(formData)
-
-    // 上传成功后调用on-success回调
     options.onSuccess(response)
   } catch (error) {
-    // 上传失败时调用错误处理
     options.onError(error)
     ElMessage.error('封面上传失败: ' + (error.response?.data?.message || error.message))
   }
 }
 
-// 成功回调
 const handleCoverSuccess = (response) => {
   if (response.data.code === 'Success') {
     const fileUrl = response.data.data
     gameForm.value.gamePicture = fileUrl
+    // 确保只显示一张图片
     coverFileList.value = [{
       name: 'cover',
-      url: "api"+fileUrl
+      url: fileUrl.startsWith('http') ? fileUrl : fileUrl
     }]
-    console.log(coverFileList.value)
     ElMessage.success('封面图片上传成功')
   } else {
     ElMessage.error(response.data.msg || '封面上传失败')
   }
 }
 
-// 校验方法
 const beforeCoverUpload = (file) => {
   const isImage = file.type.startsWith('image/')
   const isLt2M = file.size / 1024 / 1024 < 2
@@ -333,17 +375,26 @@ const submitGame = async () => {
       gameName: gameForm.value.gameName,
       gameUrl: gameForm.value.gameUrl,
       gameDescription: gameForm.value.gameDescription,
-      gamePicture: "/api"+gameForm.value.gamePicture,
+      gamePicture: gameForm.value.gamePicture || '',
       tags: tags,
       status: statusMap[gameForm.value.status]
     }
 
     const token = authStore.token
-    await gameApi.createGame(gameData, token)
-    ElMessage.success('游戏提交成功！')
+    if (isEditing.value) {
+      // 编辑模式 - 调用更新API
+      await gameApi.updateGame(route.query.gameId, gameData, token)
+      ElMessage.success('游戏更新成功！')
+    } else {
+      // 新增模式 - 调用创建API
+      await gameApi.createGame(gameData, token)
+      ElMessage.success('游戏提交成功！')
+    }
+
     resetForm()
+    router.push('/my-games') // 提交后返回我的游戏页面
   } catch (error) {
-    ElMessage.error('提交失败: ' + (error.response?.data?.message || error.message))
+    ElMessage.error('操作失败: ' + (error.response?.data?.message || error.message))
   }
 }
 
@@ -358,7 +409,6 @@ const resetForm = () => {
   }
   coverFileList.value = []
 }
-
 </script>
 
 <style scoped>
@@ -381,7 +431,7 @@ h2 {
   margin: 0 auto;
 }
 
-/* 标签区域样式修改 */
+/* 标签区域样式 */
 .tag-controls {
   margin-bottom: 15px;
 }
@@ -467,7 +517,7 @@ h2 {
   font-style: italic;
 }
 
-/* 修复标签关闭按钮样式 */
+/* 标签关闭按钮样式 */
 :deep(.el-tag__close) {
   margin-left: 6px;
   color: #409eff;

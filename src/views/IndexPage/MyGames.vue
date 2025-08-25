@@ -2,18 +2,13 @@
   <div class="my-games-container">
     <h2>我的游戏</h2>
 
-    <div class="actions">
-      <el-button type="primary" @click="showUploadDialog = true">
-        <el-icon><Plus /></el-icon> 添加游戏
-      </el-button>
-    </div>
-
+    <!-- 移除上传游戏按钮 -->
     <el-table :data="games" style="width: 100%">
       <el-table-column prop="gameName" label="游戏名称" />
-      <el-table-column prop="status" label="状态">
+      <el-table-column label="状态">
         <template #default="{ row }">
-          <el-tag :type="row.status === '待审核' ? 'success' : 'info'">
-            {{ row.status }}
+          <el-tag :type="getStatusType(row.originalStatus)">
+            {{ row.displayStatus }}
           </el-tag>
         </template>
       </el-table-column>
@@ -29,76 +24,85 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200">
+      <el-table-column label="操作" width="260">
         <template #default="{ row }">
-          <el-button size="small" @click="editGame(row)">编辑</el-button>
           <el-button
               size="small"
-              :type="row.status === '待审核' ? 'warning' : 'success'"
-              @click="toggleGameStatus(row)"
+              @click="editGame(row)"
+              :disabled="row.originalStatus === 'DELETED'"
           >
-            {{ row.status === '待审核' ? '设为私有' : '发布' }}
+            编辑
+          </el-button>
+          <el-button
+              size="small"
+              :type="getActionType(row.originalStatus)"
+              @click="toggleGameStatus(row)"
+              :disabled="row.originalStatus === 'DELETED'"
+          >
+            {{ getActionText(row.originalStatus) }}
           </el-button>
         </template>
       </el-table-column>
     </el-table>
-
-    <!-- 上传游戏对话框 -->
-    <el-dialog v-model="showUploadDialog" title="添加游戏">
-      <el-form :model="newGame" label-width="100px">
-        <el-form-item label="游戏名称" required>
-          <el-input v-model="newGame.gameName" />
-        </el-form-item>
-        <el-form-item label="游戏链接" required>
-          <el-input v-model="newGame.gameUrl" placeholder="https://" />
-        </el-form-item>
-        <el-form-item label="游戏描述">
-          <el-input v-model="newGame.gameDescription" type="textarea" rows="4" />
-        </el-form-item>
-        <el-form-item label="游戏标签">
-          <el-select
-              v-model="newGame.tags"
-              multiple
-              filterable
-              allow-create
-              placeholder="添加标签"
-              style="width: 100%"
-          >
-            <el-option
-                v-for="tag in availableTags"
-                :key="tag"
-                :label="tag"
-                :value="tag"
-            />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showUploadDialog = false">取消</el-button>
-        <el-button type="primary" @click="addGame">确认</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Plus } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'  // 新增路由导入
 import { useAuthStore } from '@/stores/auth'
 import gameApi from '@/api/game'
 import { ElMessage } from 'element-plus'
 
+const router = useRouter()  // 初始化路由
 const authStore = useAuthStore()
 const games = ref([])
-const availableTags = ref(['冒险', '益智', '教育', '科幻', '历史', '策略', '动作'])
-const showUploadDialog = ref(false)
-const newGame = ref({
-  gameName: '',
-  gameUrl: '',
-  gameDescription: '',
-  tags: [],
-  status: 'PRIVATE' // 默认私有状态
-})
+
+// 状态中文映射
+const mapStatus = (status) => {
+  switch (status) {
+    case 'UNAPPROVED': return '未审核'
+    case 'PUBLIC': return '公共的'
+    case 'PRIVATE': return '私有的'
+    case 'APPROVED': return '审核拒绝'
+    case 'DELETED': return '已删除'
+    default: return status
+  }
+}
+
+// 获取状态标签类型
+const getStatusType = (originalStatus) => {
+  switch (originalStatus) {
+    case 'UNAPPROVED': return 'info'
+    case 'PUBLIC': return 'success'
+    case 'PRIVATE': return 'warning'
+    case 'APPROVED': return 'danger'
+    case 'DELETED': return 'error'
+    default: return 'default'
+  }
+}
+
+// 获取操作按钮文本
+const getActionText = (originalStatus) => {
+  switch (originalStatus) {
+    case 'PUBLIC': return '设为私有'
+    case 'PRIVATE': return '发布'
+    case 'UNAPPROVED': return '设为私有'
+    case 'APPROVED': return '重新提交'
+    default: return '操作'
+  }
+}
+
+// 获取操作按钮类型
+const getActionType = (originalStatus) => {
+  switch (originalStatus) {
+    case 'PUBLIC': return 'warning'
+    case 'PRIVATE': return 'primary'
+    case 'UNAPPROVED': return 'warning'
+    case 'APPROVED': return 'primary'
+    default: return 'default'
+  }
+}
 
 // 获取用户游戏
 const fetchGames = async () => {
@@ -107,7 +111,8 @@ const fetchGames = async () => {
     if (response.data.code === 'Success') {
       games.value = response.data.data.map(game => ({
         ...game,
-        status: game.status === 'UNAPPROVED' ? '待审核' : '私有'
+        displayStatus: mapStatus(game.status),
+        originalStatus: game.status
       }))
     } else {
       ElMessage.error(response.data.msg || '获取游戏列表失败')
@@ -117,31 +122,27 @@ const fetchGames = async () => {
   }
 }
 
-// 添加游戏
-const addGame = async () => {
-  try {
-    const gameData = {
-      gameName: newGame.value.gameName,
-      gameUrl: newGame.value.gameUrl,
-      gameDescription: newGame.value.gameDescription,
-      tags: newGame.value.tags,
-      status: newGame.value.status
-    }
-
-    await gameApi.createGame(gameData)
-    ElMessage.success('游戏添加成功!')
-    showUploadDialog.value = false
-    resetNewGame()
-    fetchGames() // 刷新列表
-  } catch (error) {
-    ElMessage.error('添加游戏失败: ' + (error.response?.data?.message || error.message))
-  }
-}
-
 // 切换游戏状态
 const toggleGameStatus = async (game) => {
   try {
-    const newStatus = game.status === '待审核' ? 'PRIVATE' : 'UNAPPROVED'
+    let newStatus
+    switch (game.originalStatus) {
+      case 'PUBLIC':
+        newStatus = 'PRIVATE'
+        break
+      case 'PRIVATE':
+        newStatus = 'UNAPPROVED'
+        break
+      case 'UNAPPROVED':
+        newStatus = 'PRIVATE'
+        break
+      case 'APPROVED':
+        newStatus = 'UNAPPROVED'
+        break
+      default:
+        return
+    }
+
     await gameApi.changeGameStatus(game.id, newStatus, "-")
     ElMessage.success('游戏状态已更新')
     fetchGames() // 刷新列表
@@ -150,20 +151,12 @@ const toggleGameStatus = async (game) => {
   }
 }
 
-// 编辑游戏
+// 编辑游戏 - 跳转到UploadGame页面并携带gameId
 const editGame = (game) => {
-  console.log('编辑游戏:', game)
-  // 实际实现需要打开编辑对话框
-}
-
-const resetNewGame = () => {
-  newGame.value = {
-    gameName: '',
-    gameUrl: '',
-    gameDescription: '',
-    tags: [],
-    status: 'PRIVATE'
-  }
+  router.push({
+    path: '/index',
+    query: { page:'upload',gameId: game.id }
+  })
 }
 
 onMounted(fetchGames)
@@ -175,12 +168,6 @@ onMounted(fetchGames)
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}
-
-.actions {
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: flex-end;
 }
 
 h2 {

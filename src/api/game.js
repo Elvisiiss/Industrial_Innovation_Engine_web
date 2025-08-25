@@ -41,8 +41,8 @@ export default {
     },
 
     // 审核游戏
-    reviewGame(gameId, action, reason = '') {
-        return request.post(`/games/${gameId}/review`, { action, reason })
+    reviewGame(gameId, status, examineDescription) {
+        return request.post(`/games/${gameId}/review`, { status, examineDescription })
     },
 
     // 获取审核历史
@@ -58,5 +58,10 @@ export default {
     // 新增：获取游戏统计信息
     getStats() {
         return request.get('/games/stats')
-    }
+    },
+
+    // 根据id来获取游戏
+    getGameById(gameId) {
+        return request.get(`/games/get/${gameId}`)
+    },
 }

@@ -66,6 +66,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ArrowDown } from '@element-plus/icons-vue'
+import indexPage from './indexPage.vue'
 import MyGames from './MyGames.vue'
 import UploadGame from './UploadGame.vue'
 import ReviewGames from './ReviewGames.vue'
@@ -90,7 +91,7 @@ const currentPage = ref(route.query.page || 'index')
 
 // 页面组件映射
 const pageComponents = {
-  'index': { component: MyGames, roles: ['学生', '教师', '管理员'] },
+  'index': { component: indexPage, roles: ['学生', '教师', '管理员'] },
   'my-games': { component: MyGames, roles: ['学生', '教师', '管理员'] },
   'upload': { component: UploadGame, roles: ['学生', '教师', '管理员'] },
   'review': { component: ReviewGames, roles: ['教师', '管理员'] },
