@@ -6,6 +6,7 @@ export default {
         return request.get(`/tool/getAllMyTags`)
     },
 
+    //上传图片
     uploadGamePicture(pictureFile){
         return request.post(`/tool/uploadGamePicture`,pictureFile)
     },
@@ -51,8 +52,14 @@ export default {
     },
 
     // 搜索游戏
-    searchGames(keyword) {
-        return request.get('/games/search', { params: { keyword } })
+    searchGames(searchRequest) {
+        return request.get('/games/search', {
+            params: {
+                myId: searchRequest.myId,
+                keyword: searchRequest.keyword,
+                wannaMe: searchRequest.wannaMe
+            }
+        })
     },
 
     // 新增：获取游戏统计信息

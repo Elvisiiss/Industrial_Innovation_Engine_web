@@ -392,7 +392,7 @@ const submitGame = async () => {
     }
 
     resetForm()
-    router.push('/my-games') // 提交后返回我的游戏页面
+    router.push('/index?page=my-games') // 提交后返回我的游戏页面
   } catch (error) {
     ElMessage.error('操作失败: ' + (error.response?.data?.message || error.message))
   }

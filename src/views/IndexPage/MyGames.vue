@@ -24,7 +24,7 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="260">
+      <el-table-column label="操作" width="300">
         <template #default="{ row }">
           <el-button
               size="small"
@@ -41,6 +41,14 @@
           >
             {{ getActionText(row.originalStatus) }}
           </el-button>
+          <el-button
+              size="small"
+              type="danger"
+              @click="handleDeleteGame(row)"
+              :disabled="row.originalStatus === 'DELETED'"
+          >
+            删除
+          </el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -52,7 +60,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'  // 新增路由导入
 import { useAuthStore } from '@/stores/auth'
 import gameApi from '@/api/game'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()  // 初始化路由
 const authStore = useAuthStore()
@@ -157,6 +165,34 @@ const editGame = (game) => {
     path: '/index',
     query: { page:'upload',gameId: game.id }
   })
+}
+
+// 删除游戏
+const handleDeleteGame = async (game) => {
+  try {
+    await ElMessageBox.confirm(
+        `确定要删除游戏 "${game.gameName}" 吗？此操作不可恢复。`,
+        '删除确认',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
+    )
+
+    // 用户确认删除
+    const response = await gameApi.deleteGame(game.id)
+    if (response.data.code === 'Success') {
+      ElMessage.success('游戏删除成功')
+      fetchGames() // 刷新列表
+    } else {
+      ElMessage.error(response.data.msg || '删除游戏失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除游戏失败: ' + (error.response?.data?.message || error.message))
+    }
+  }
 }
 
 onMounted(fetchGames)
